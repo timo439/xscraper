@@ -1,23 +1,3 @@
-const MIN_RETWEETS = 500;
-
-function filterTweets(items) {
-  return items
-    .filter(item => {
-      const rt   = item.retweetCount ?? item.retweet_count ?? 0;
-      const text = item.text || item.full_text || '';
-      return rt >= MIN_RETWEETS && !text.startsWith('RT @') && !text.startsWith('@');
-    })
-    .sort((a, b) => {
-      const rtA = a.retweetCount ?? a.retweet_count ?? 0;
-      const rtB = b.retweetCount ?? b.retweet_count ?? 0;
-      return rtB - rtA;
-    })
-    .map(item => ({
-      text:     item.text || item.full_text,
-      retweets: item.retweetCount ?? item.retweet_count ?? 0
-    }));
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -36,7 +16,7 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           startUrls: ACCOUNTS.map(h => ({ url: `https://twitter.com/${h}` })),
-          maxTweets: 50,
+          maxTweets: 10,
           addUserInfo: false,
           scrapeTweetReplies: false
         })
@@ -48,19 +28,12 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: `Apify error: ${err}` });
     }
 
-    const items     = await response.json();
-    const qualified = filterTweets(items);
+    const items = await response.json();
 
-    if (qualified.length === 0) {
-      return res.status(200).json({
-        error: `No tweets met the ${MIN_RETWEETS}+ retweet threshold. Found ${items.length} total tweets.`
-      });
-    }
-
-    const top = qualified[0];
+    // Return first item raw so we can inspect the field names
     return res.status(200).json({
-      text:     top.text,
-      retweets: top.retweets
+      total: items.length,
+      sample: items.slice(0, 2)
     });
 
   } catch (err) {
