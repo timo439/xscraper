@@ -1,3 +1,17 @@
+function getRetweets(item) {
+  // Handle all known Apify Twitter scraper field variants
+  return item.retweetCount
+    ?? item.retweet_count
+    ?? item.public_metrics?.retweet_count
+    ?? item.stats?.retweetCount
+    ?? item.retweetsCount
+    ?? 0;
+}
+
+function getText(item) {
+  return item.text || item.full_text || item.tweet_text || '';
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -7,6 +21,7 @@ export default async function handler(req, res) {
 
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   const ACCOUNTS    = ['orangebook_', 'naval'];
+  const MIN_RETWEETS = 0; // Testing: no threshold
 
   try {
     const response = await fetch(
@@ -16,7 +31,7 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           startUrls: ACCOUNTS.map(h => ({ url: `https://twitter.com/${h}` })),
-          maxTweets: 5,
+          maxTweets: 20,
           addUserInfo: false,
           scrapeTweetReplies: false
         })
@@ -29,30 +44,30 @@ export default async function handler(req, res) {
     }
 
     const items = await response.json();
-    const sample = items[0] || {};
 
-    // Log all keys and retweet-related fields so we can see the structure
-    console.log('TOTAL ITEMS:', items.length);
-    console.log('KEYS:', Object.keys(sample).join(', '));
-    console.log('RT FIELDS:', JSON.stringify({
-      retweetCount: sample.retweetCount,
-      retweet_count: sample.retweet_count,
-      retweeted: sample.retweeted,
-      public_metrics: sample.public_metrics,
-      likeCount: sample.likeCount,
-      favoriteCount: sample.favoriteCount,
-    }));
+    // Log the first item's full structure for debugging
+    if (items.length > 0) {
+      console.log('SAMPLE ITEM KEYS:', Object.keys(items[0]).join(', '));
+      console.log('SAMPLE RT VALUE:', getRetweets(items[0]));
+      console.log('SAMPLE TEXT:', getText(items[0]).substring(0, 80));
+    }
 
+    const qualified = items
+      .filter(item => {
+        const rt   = getRetweets(item);
+        const text = getText(item);
+        return rt >= MIN_RETWEETS && !text.startsWith('RT @') && !text.startsWith('@');
+      })
+      .sort((a, b) => getRetweets(b) - getRetweets(a));
+
+    if (qualified.length === 0) {
+      return res.status(200).json({ error: `No tweets found. Total scraped: ${items.length}` });
+    }
+
+    const top = qualified[0];
     return res.status(200).json({
-      total: items.length,
-      keys: Object.keys(sample),
-      sample: items.slice(0, 2).map(i => ({
-        text: (i.text || i.full_text || '').substring(0, 100),
-        retweetCount: i.retweetCount,
-        retweet_count: i.retweet_count,
-        public_metrics: i.public_metrics,
-        likeCount: i.likeCount,
-      }))
+      text:     getText(top),
+      retweets: getRetweets(top)
     });
 
   } catch (err) {
