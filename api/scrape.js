@@ -1,18 +1,5 @@
 const MIN_RETWEETS = 1000;
 
-async function fetchRunStatus(runId, token) {
-  const r = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`);
-  const d = await r.json();
-  return { status: d.data.status, datasetId: d.data.defaultDatasetId };
-}
-
-async function fetchDataset(datasetId, token) {
-  const r = await fetch(
-    `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&format=json`
-  );
-  return r.json();
-}
-
 function filterTweets(items) {
   return items
     .filter(item => {
@@ -77,45 +64,50 @@ Tweet: ${tweetText}`;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-
-  const { runId } = req.query;
-  if (!runId) return res.status(400).json({ error: 'Missing runId' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const APIFY_TOKEN   = process.env.APIFY_TOKEN;
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  const ACCOUNTS      = ['orangebook_'];
 
   try {
-    // 1. Check run status
-    const { status, datasetId } = await fetchRunStatus(runId, APIFY_TOKEN);
+    // Single synchronous call — runs actor and returns dataset items directly
+    const response = await fetch(
+      `https://api.apify.com/v2/acts/apidojo~twitter-scraper-lite/run-sync-get-dataset-items?token=${APIFY_TOKEN}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: ACCOUNTS.map(h => ({ url: `https://twitter.com/${h}` })),
+          maxTweets: 50,
+          addUserInfo: false,
+          scrapeTweetReplies: false
+        })
+      }
+    );
 
-    if (status === 'RUNNING' || status === 'READY' || status === 'CREATED') {
-      return res.status(200).json({ status: 'pending', runStatus: status });
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(500).json({ error: `Apify error: ${err}` });
     }
 
-    if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
-      return res.status(500).json({ error: `Apify run ${status}`, status: 'failed' });
-    }
-
-    // 2. Fetch + filter tweets
-    const items     = await fetchDataset(datasetId, APIFY_TOKEN);
+    const items     = await response.json();
     const qualified = filterTweets(items);
 
     if (qualified.length === 0) {
       return res.status(200).json({
-        status: 'done',
         error: `No tweets met the ${MIN_RETWEETS}+ retweet threshold. Found ${items.length} total tweets.`
       });
     }
 
-    // 3. Try reshaping candidates best-first
+    // Try reshaping candidates best-first
     for (const candidate of qualified) {
       const quote = await reshapeTweet(candidate.text, ANTHROPIC_KEY);
       if (quote) {
         return res.status(200).json({
-          status:   'done',
           title:    quote.title,
           body:     quote.body,
           source:   candidate.text,
@@ -125,11 +117,10 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      status: 'done',
-      error:  `${qualified.length} tweets passed threshold but none could be reshaped to meet the hypothesis.`
+      error: `${qualified.length} tweets passed threshold but none could be reshaped to meet the rules.`
     });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message, status: 'failed' });
+    return res.status(500).json({ error: err.message });
   }
 }

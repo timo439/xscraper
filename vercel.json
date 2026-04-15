@@ -1,7 +1,6 @@
 {
   "functions": {
-    "api/start.js": { "maxDuration": 10 },
-    "api/poll.js": { "maxDuration": 10 }
+    "api/scrape.js": { "maxDuration": 60 }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },

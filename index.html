@@ -350,9 +350,6 @@ button.secondary {
 <div class="meta" id="sourceMeta"></div>
 
 <script>
-let pollInterval = null;
-let currentRunId = null;
-
 function setStatus(msg, type = '') {
   const el = document.getElementById('statusBar');
   el.innerHTML = msg;
@@ -366,49 +363,19 @@ function setGenerating(active) {
 
 async function startGenerate() {
   setGenerating(true);
-  setStatus('<span class="spinner"></span>Starting Apify scraper for @orangebook_...');
+  setStatus('<span class="spinner"></span>Scraping @orangebook_ and generating quote — this takes ~30 seconds...');
   document.getElementById('placeholder').style.display = 'flex';
   document.getElementById('cardTitle').style.display = 'none';
   document.getElementById('cardBody').style.display = 'none';
   document.getElementById('sourceMeta').textContent = '';
 
   try {
-    const res  = await fetch('/api/start', { method: 'POST' });
+    const res  = await fetch('/api/scrape', { method: 'POST' });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    currentRunId = data.runId;
-    setStatus('<span class="spinner"></span>Scraping tweets... filtering to 1,000+ retweets');
-    pollInterval = setInterval(pollStatus, 5000);
+    renderQuote(data);
   } catch (err) {
     setStatus('Error: ' + err.message, 'error');
-    setGenerating(false);
-  }
-}
-
-async function pollStatus() {
-  try {
-    const res  = await fetch('/api/poll?runId=' + currentRunId);
-    const data = await res.json();
-
-    if (data.status === 'pending') {
-      setStatus('<span class="spinner"></span>Scraping tweets... filtering to 1,000+ retweets (' + data.runStatus + ')');
-      return;
-    }
-
-    clearInterval(pollInterval);
-
-    if (data.error) {
-      setStatus(data.error, 'error');
-      setGenerating(false);
-      return;
-    }
-
-    if (data.status === 'done' && data.title) {
-      renderQuote(data);
-    }
-  } catch (err) {
-    clearInterval(pollInterval);
-    setStatus('Poll error: ' + err.message, 'error');
     setGenerating(false);
   }
 }
