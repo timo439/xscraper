@@ -16,7 +16,7 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           startUrls: ACCOUNTS.map(h => ({ url: `https://twitter.com/${h}` })),
-          maxTweets: 10,
+          maxTweets: 5,
           addUserInfo: false,
           scrapeTweetReplies: false
         })
@@ -29,11 +29,30 @@ export default async function handler(req, res) {
     }
 
     const items = await response.json();
+    const sample = items[0] || {};
 
-    // Return first item raw so we can inspect the field names
+    // Log all keys and retweet-related fields so we can see the structure
+    console.log('TOTAL ITEMS:', items.length);
+    console.log('KEYS:', Object.keys(sample).join(', '));
+    console.log('RT FIELDS:', JSON.stringify({
+      retweetCount: sample.retweetCount,
+      retweet_count: sample.retweet_count,
+      retweeted: sample.retweeted,
+      public_metrics: sample.public_metrics,
+      likeCount: sample.likeCount,
+      favoriteCount: sample.favoriteCount,
+    }));
+
     return res.status(200).json({
       total: items.length,
-      sample: items.slice(0, 2)
+      keys: Object.keys(sample),
+      sample: items.slice(0, 2).map(i => ({
+        text: (i.text || i.full_text || '').substring(0, 100),
+        retweetCount: i.retweetCount,
+        retweet_count: i.retweet_count,
+        public_metrics: i.public_metrics,
+        likeCount: i.likeCount,
+      }))
     });
 
   } catch (err) {
