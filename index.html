@@ -363,7 +363,7 @@ function setGenerating(active) {
 
 async function startGenerate() {
   setGenerating(true);
-  setStatus('<span class="spinner"></span>Scraping @orangebook_ and generating quote — this takes ~30 seconds...');
+  setStatus('<span class="spinner"></span>Scraping @orangebook_ & @naval for top tweets — takes ~30 seconds...');
   document.getElementById('placeholder').style.display = 'flex';
   document.getElementById('cardTitle').style.display = 'none';
   document.getElementById('cardBody').style.display = 'none';
@@ -395,10 +395,9 @@ function renderQuote(data) {
 }
 
 function downloadCard() {
-  const title = document.getElementById('cardTitle').textContent;
-  const body  = document.getElementById('cardBody').textContent;
-  if (!title) return;
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
+  const text = document.getElementById('cardTitle').textContent;
+  if (!text) return;
+  const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
   const html = document.documentElement.outerHTML;
   const blob = new Blob([html], { type: 'text/html' });
   const a = document.createElement('a');
