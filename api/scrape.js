@@ -1,4 +1,4 @@
-const MIN_RETWEETS = 1000;
+const MIN_RETWEETS = 500;
 
 function filterTweets(items) {
   return items
