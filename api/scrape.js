@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
-  const ACCOUNTS    = ['orangebook_'];
+  const ACCOUNTS    = ['orangebook_', 'naval'];
 
   try {
     const response = await fetch(
