@@ -18,50 +18,6 @@ function filterTweets(items) {
     }));
 }
 
-async function reshapeTweet(tweetText, anthropicKey) {
-  const prompt = `You are a quote editor for a self-improvement Instagram account (@timarmoo).
-
-Reshape the tweet below into a 2-part quote card.
-
-RULES — all must be met or return invalid:
-- Total word count: 19–25 words across BOTH parts combined. Count every word carefully.
-- Part 1 (title): punchy standalone opener. The sharper, more provocative half.
-- Part 2 (body): follow-through — adds context, contrast, or consequence.
-- Topic must relate to: self-development, achieving goals, or success in life/work/business.
-- No motivational fluff. No clichés. Direct and earned.
-- If the tweet CANNOT meet all rules, return: {"valid": false}
-
-Return JSON only, no markdown:
-{"valid": true, "title": "Part 1", "body": "Part 2"}
-
-Tweet: ${tweetText}`;
-
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 300,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  const data = await r.json();
-  try {
-    const result = JSON.parse(data.content[0].text.trim());
-    if (!result.valid) return null;
-    const wordCount = (result.title + ' ' + result.body).split(/\s+/).length;
-    if (wordCount < 19 || wordCount > 25) return null;
-    return result;
-  } catch {
-    return null;
-  }
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -69,12 +25,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const APIFY_TOKEN   = process.env.APIFY_TOKEN;
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-  const ACCOUNTS      = ['orangebook_'];
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  const ACCOUNTS    = ['orangebook_'];
 
   try {
-    // Single synchronous call — runs actor and returns dataset items directly
     const response = await fetch(
       `https://api.apify.com/v2/acts/apidojo~twitter-scraper-lite/run-sync-get-dataset-items?token=${APIFY_TOKEN}`,
       {
@@ -103,21 +57,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Try reshaping candidates best-first
-    for (const candidate of qualified) {
-      const quote = await reshapeTweet(candidate.text, ANTHROPIC_KEY);
-      if (quote) {
-        return res.status(200).json({
-          title:    quote.title,
-          body:     quote.body,
-          source:   candidate.text,
-          retweets: candidate.retweets
-        });
-      }
-    }
-
+    const top = qualified[0];
     return res.status(200).json({
-      error: `${qualified.length} tweets passed threshold but none could be reshaped to meet the rules.`
+      text:     top.text,
+      retweets: top.retweets
     });
 
   } catch (err) {

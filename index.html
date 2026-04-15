@@ -383,11 +383,10 @@ async function startGenerate() {
 function renderQuote(data) {
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('cardTitle').style.display = 'block';
-  document.getElementById('cardBody').style.display = 'block';
-  document.getElementById('cardTitle').textContent = data.title;
-  document.getElementById('cardBody').textContent  = data.body;
+  document.getElementById('cardBody').style.display = 'none';
+  document.getElementById('cardTitle').textContent = data.text;
   document.getElementById('igLikes').textContent   = Math.floor(Math.random() * 15000 + 5000).toLocaleString() + ' likes';
-  document.getElementById('igCaption').textContent = data.title.substring(0, 60) + '...';
+  document.getElementById('igCaption').textContent = data.text.substring(0, 60) + '...';
   document.getElementById('sourceMeta').textContent =
     'Source: @orangebook_ · ' + data.retweets.toLocaleString() + ' retweets';
   setStatus('Quote generated ✓', 'success');
